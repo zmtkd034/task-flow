@@ -101,9 +101,16 @@
   - 사전 확인: 같은 설정을 일반 계정 Nginx(127.0.0.1:8088)로 실행해 nginx -t 통과, 화면·JS·CSS 형식, /api 전달, /docs·/openapi.json·/.env·/backend 404, 보안 헤더, 64k 초과 413, 브라우저 등록·상태 변경 DB 반영·CSP 차단 없음 확인(시험 항목 삭제).
   - 확인 결과(2026-10-13): 16:31:35 브라우저(http://localhost)에서 "집 가기" 등록 → Nginx 접근 로그 POST /api/tasks 201, App 로그 201, DB SELECT로 id 4 행 확인. 16:31:50 App 재시작(PID 33993 → 35313, journal Stopped/Started). 16:32:07 새로고침 GET /api/tasks 200, 목록에 "집 가기" 유지. 배포된 화면·Nginx 설정이 저장소 파일과 동일, nginx active·enabled.
   - 남은 오류: 첫 실행 때 스크립트 마지막 확인이 Nginx reload 완료 전에 실행되어 health가 기본 사이트의 404로 표시됐다(실제 설정은 2초 뒤 정상 적용). 응답이 올 때까지 기다린 뒤 확인하도록 install-web.sh를 수정했다. HTTPS는 PRD 범위 밖이라 구성하지 않았다.
+## 추가 작업
+- [x] 개발 서버 통합: 화면(5500)과 API(8000)를 개발 서버 하나(8000)로 합친다(사용자 요청, 2026-10-13).
+  - 변경 파일: backend/main.py(프로젝트에 frontend/가 있으면 / 로 화면 제공, CORS 제거), frontend/app.js(API_BASE를 같은 주소로 고정), API-SPEC.md(CORS 설명을 같은 주소 제공으로 변경), PLAN.md(실행 기준)
+  - 실행 명령: 가상환경에서 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload → http://127.0.0.1:8000
+  - 확인 결과(2026-10-13): 8000에서 /·index.html·app.js·styles.css(올바른 형식)·/api/health·/api/tasks·/docs 200, 없는 API·파일 404. 다른 주소(5500)의 CORS 사전 요청은 허용되지 않음(405). 브라우저로 8000 사용 시 API를 같은 주소로만 호출, 등록·상태 변경·수정·삭제 취소/확인·검색 정상, 기존 DB 데이터 불변, JS 오류 없음. 배포 조건(frontend/ 없는 별도 폴더)에서는 / 404·/api/health 200으로 API만 제공. 배포 App(8001)·Web(localhost) 정상 응답 유지. 5500 서버 종료.
+  - 남은 오류: 없음. 배포본(/opt/task-flow, /var/www/task-flow)은 이전 코드라 동작은 같지만 저장소와 맞추려면 sudo bash deploy/install-app.sh, sudo bash deploy/install-web.sh를 다시 실행한다.
 ## 실행 기준
-T01~T04: python3 -m http.server 5500 --bind 127.0.0.1 --directory frontend
-T05~T11: 가상환경에서 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+개발 서버(화면+API, 통합 후): 가상환경에서 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload → http://127.0.0.1:8000
+배포(Web·App·DB): http://localhost (sudo bash deploy/install-app.sh, sudo bash deploy/install-web.sh로 반영)
+(작업 당시 기록) T01~T04: python3 -m http.server 5500 --bind 127.0.0.1 --directory frontend / T05~T11: 위 uvicorn 명령(API만)
 실제 존재하는 파일을 확인한 뒤 명령을 실행한다.
 ## 기록
 각 작업에 변경 파일, 실행 명령, 실제 확인 결과, 남은 오류를 기록한다.

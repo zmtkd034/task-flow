@@ -1,18 +1,20 @@
 """Task Flow API.
 
 T07: 할 일 등록·조회·부분 수정·삭제와 목록 필터.
-T08: 개발용 화면(5500번 포트)에서 호출할 수 있도록 CORS를 허용한다.
+T08: 화면이 API를 호출해 저장한다.
 T11: 할 일을 MariaDB(tasks 테이블)에 저장한다. API를 재시작해도 데이터가 유지된다.
      실행 전에 python -m backend.init_db로 테이블을 만들어 둔다.
+개발 서버 통합: 프로젝트에 frontend/가 있으면 화면도 같은 주소로 제공한다(개발 서버 하나로 화면+API).
 """
 
 from collections.abc import Iterator
 from datetime import date, datetime, timezone
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
@@ -21,17 +23,9 @@ from backend.database import SessionLocal
 from backend.models import TaskRow
 from backend.schemas import Priority, Status, Task, TaskCreate, TaskUpdate
 
-app = FastAPI(title="Task Flow API")
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
-# 화면(127.0.0.1:5500)과 API(127.0.0.1:8000)의 주소가 달라 브라우저가 막으므로 개발용 화면 주소만 허용한다.
-# 배포 단계(T14)에서는 Nginx가 같은 주소로 /api를 전달하므로 CORS가 필요 없다.
-DEV_FRONTEND_ORIGINS = ["http://127.0.0.1:5500", "http://localhost:5500"]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=DEV_FRONTEND_ORIGINS,
-    allow_methods=["GET", "POST", "PATCH", "DELETE"],
-    allow_headers=["Content-Type"],
-)
+app = FastAPI(title="Task Flow API")
 
 
 @app.exception_handler(OperationalError)
@@ -127,3 +121,10 @@ def delete_task(task_id: int, session: SessionDep) -> Response:
     session.delete(_get_row(session, task_id))
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# 개발 환경(프로젝트 폴더)에서는 화면 파일도 같은 주소로 제공해 개발 서버 하나로 쓴다.
+# 배포된 App(/opt/task-flow)에는 frontend/가 없어 API만 제공하고, 화면은 Nginx가 제공한다.
+# API 경로를 먼저 등록했으므로 /api/... 요청은 화면 파일보다 API가 먼저 처리한다.
+if (FRONTEND_DIR / "index.html").is_file():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

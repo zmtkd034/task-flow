@@ -7,9 +7,8 @@ const STATUS_LABELS = { TODO: "할 일", DOING: "진행 중", DONE: "완료" };
 const TASK_PRIORITIES = ["HIGH", "NORMAL", "LOW"];
 const PRIORITY_LABELS = { HIGH: "높음", NORMAL: "보통", LOW: "낮음" };
 
-// 개발 단계에서는 화면(5500)과 API(8000)가 따로 실행되고, 배포 단계에서는 같은 주소의 /api를 쓴다.
-const API_BASE =
-  window.location.port === "5500" ? `${window.location.protocol}//${window.location.hostname}:8000` : "";
+// 화면과 API는 항상 같은 주소에서 제공된다(개발: uvicorn 8000번, 배포: Nginx). 그래서 /api를 그대로 부른다.
+const API_BASE = "";
 
 let tasks = [];
 // "loading" | "ready" | "error". 목록을 불러오지 못하면 빈 목록 안내 대신 오류를 보여 준다.
