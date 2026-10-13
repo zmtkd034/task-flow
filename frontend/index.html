@@ -10,7 +10,10 @@
   <main class="container">
     <h1>Task Flow</h1>
 
-    <p id="storage-warning" class="storage-warning" role="alert" hidden></p>
+    <div id="api-error" class="api-error" role="alert" hidden>
+      <span id="api-error-text"></span>
+      <button id="retry-button" type="button">다시 불러오기</button>
+    </div>
 
     <form id="task-form" class="task-form" novalidate>
       <div class="form-row">
@@ -57,7 +60,8 @@
         </select>
       </div>
 
-      <p id="empty-message" class="empty-message">등록된 할 일이 없습니다.</p>
+      <p id="loading-message" class="empty-message">할 일을 불러오는 중입니다…</p>
+      <p id="empty-message" class="empty-message" hidden>등록된 할 일이 없습니다.</p>
       <p id="filter-empty-message" class="empty-message" hidden>조건에 맞는 할 일이 없습니다.</p>
       <ul id="task-list" class="task-list"></ul>
     </section>

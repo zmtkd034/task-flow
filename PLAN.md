@@ -51,8 +51,12 @@
   - 확인 결과(2026-10-13, HTTP 요청 자동 확인 54개 통과 + curl): status만 PATCH 시 나머지 필드 유지, 여러 필드 동시 수정, due_date null로 마감일 삭제, {}는 변경 없음, 다른 항목·순서·id·created_at 불변. title·description·status·priority null, 빈·101자 제목, 2001자 설명, 잘못된 값·날짜, id·created_at·정의 안 된 필드, 유효+무효 혼합은 422이며 일부만 적용되지 않음. 없는 id PATCH·DELETE 404, 숫자 아닌 id 422. DELETE 204(본문 없음), 해당 항목만 삭제, 재삭제 404, 삭제된 id 재사용 안 함. 필터 q(대소문자 무시·공백 제거, 제목만)·status·priority AND, 결과 없음 200 [], 잘못된 status·priority 422.
   - 사용자 확인(2026-10-13): /docs에서 PATCH 200(상태만 변경), DELETE 204, 같은 id 재삭제 404 정상.
   - 남은 오류: 없음.
-- [ ] T08: 프런트엔드 저장 처리를 API 호출로 교체.
+- [x] T08: 프런트엔드 저장 처리를 API 호출로 교체.
   확인: 화면과 curl 목록이 같음. API 중지 시 오류 표시.
+  - 변경 파일: frontend/app.js(localStorage 제거, fetch로 GET·POST·PATCH·DELETE), frontend/index.html(API 오류 배너·다시 불러오기·불러오는 중 안내), frontend/styles.css(배너·비활성 스타일), backend/main.py(CORS: 127.0.0.1:5500·localhost:5500만 허용), API-SPEC.md(CORS 설명)
+  - 실행 명령: 화면 python3 -m http.server 5500 --bind 127.0.0.1 --directory frontend / API .venv 활성화 후 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+  - 확인 결과(2026-10-13, Headless Chromium + curl 자동 확인 43개 통과, T07 API 회귀 통과): 화면에서 등록·상태 변경·수정(마감일 지움 null)·삭제 후 curl 목록과 id·순서·제목 일치, curl로 등록한 항목이 새로고침 후 화면에 표시. 삭제 취소 시 API에 남음, 필터 중 수정·삭제가 id 기준 해당 항목에만 적용, 어제 마감 TODO 지연 표시, HTML 제목 글자 표시. 서버 422 시 안내·입력값 유지, 요청 중 재제출해도 1건만 등록, 다른 곳에서 삭제된 항목 조작 시 404 안내 후 목록 다시 불러옴. API를 실제로 중지하고 확인: 새로 연 화면은 "목록을 불러오지 못했습니다" 배너와 다시 불러오기 버튼(빈 목록 안내 대신), 등록 실패 안내·입력값 유지. 열린 화면에서는 상태 변경 실패 시 선택값 원래대로, 수정 실패 시 입력값 유지, 삭제 실패 시 항목 유지. API 재시작 후 다시 불러오기로 복구(메모리 단계라 목록 비어 있음). 허용하지 않은 Origin의 CORS 사전 요청은 400.
+  - 남은 오류: 없음. 검색·필터는 받아 온 목록으로 화면에서 계산한다(API 필터는 T07에서 구현되어 있음). localStorage(task-flow-v1)의 예전 값은 읽거나 지우지 않고 그대로 둔다(PRD: 단계 간 자동 이전 없음).
 ## 4장: DB
 - [ ] T09: MariaDB 전용 사용자·DB와 .env 준비. 접속 확인.
 - [ ] T10: backend/database.py, models.py, init_db.py 생성.

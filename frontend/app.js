@@ -1,16 +1,21 @@
-// T04: 등록·목록·저장·상태 변경·수정·삭제 + 설명·우선순위·마감일·검색·필터·지연 표시.
+// T08: 할 일 저장을 localStorage 대신 Task Flow API(/api/tasks) 호출로 처리한다.
+// 검색·필터·지연 표시는 받아 온 목록으로 화면에서 계산한다.
 const TITLE_MAX_LENGTH = 100;
 const DESCRIPTION_MAX_LENGTH = 2000;
-const STORAGE_KEY = "task-flow-v1";
 const TASK_STATUSES = ["TODO", "DOING", "DONE"];
 const STATUS_LABELS = { TODO: "할 일", DOING: "진행 중", DONE: "완료" };
 const TASK_PRIORITIES = ["HIGH", "NORMAL", "LOW"];
 const PRIORITY_LABELS = { HIGH: "높음", NORMAL: "보통", LOW: "낮음" };
-const SAVE_ERROR_MESSAGE = "저장에 실패했습니다. 잠시 후 다시 시도해 주세요.";
+
+// 개발 단계에서는 화면(5500)과 API(8000)가 따로 실행되고, 배포 단계에서는 같은 주소의 /api를 쓴다.
+const API_BASE =
+  window.location.port === "5500" ? `${window.location.protocol}//${window.location.hostname}:8000` : "";
 
 let tasks = [];
-// 저장값이 손상되었거나 저장소를 쓸 수 없으면 false가 되어 저장을 멈춘다.
-let canSave = true;
+// "loading" | "ready" | "error". 목록을 불러오지 못하면 빈 목록 안내 대신 오류를 보여 준다.
+let loadState = "loading";
+// 등록 요청이 끝나기 전에 다시 제출해도 중복 등록되지 않도록 막는다.
+let isSubmitting = false;
 // 수정 중인 항목의 id. 수정·삭제는 화면 순번이 아닌 id로 처리한다.
 let editingId = null;
 let editError = "";
@@ -23,19 +28,65 @@ const priorityInput = document.getElementById("task-priority");
 const dueDateInput = document.getElementById("task-due-date");
 const descriptionInput = document.getElementById("task-description");
 const formError = document.getElementById("form-error");
-const storageWarning = document.getElementById("storage-warning");
+const apiError = document.getElementById("api-error");
+const apiErrorText = document.getElementById("api-error-text");
+const retryButton = document.getElementById("retry-button");
 const filterSearch = document.getElementById("filter-search");
 const filterStatus = document.getElementById("filter-status");
 const filterPriority = document.getElementById("filter-priority");
 const taskList = document.getElementById("task-list");
+const loadingMessage = document.getElementById("loading-message");
 const emptyMessage = document.getElementById("empty-message");
 const filterEmptyMessage = document.getElementById("filter-empty-message");
 
-function createId() {
-  if (window.crypto && typeof window.crypto.randomUUID === "function") {
-    return window.crypto.randomUUID();
+class ApiError extends Error {
+  constructor(status) {
+    super(`API error ${status}`);
+    // 0은 서버에 연결하지 못한 경우다.
+    this.status = status;
   }
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function request(method, path, body) {
+  const options = { method };
+  if (body !== undefined) {
+    options.headers = { "Content-Type": "application/json" };
+    options.body = JSON.stringify(body);
+  }
+
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, options);
+  } catch {
+    throw new ApiError(0);
+  }
+  if (!response.ok) {
+    throw new ApiError(response.status);
+  }
+  return response.status === 204 ? null : response.json();
+}
+
+function getErrorMessage(error) {
+  if (!(error instanceof ApiError) || error.status === 0) {
+    return "API 서버에 연결할 수 없습니다. 서버가 켜져 있는지 확인해 주세요.";
+  }
+  if (error.status === 404) {
+    return "이미 삭제되었거나 없는 할 일입니다. 목록을 새로 불러왔습니다.";
+  }
+  if (error.status === 422) {
+    return "입력값이 올바르지 않아 서버가 거절했습니다.";
+  }
+  return `서버 오류가 발생했습니다(${error.status}). 잠시 후 다시 시도해 주세요.`;
+}
+
+function showApiError(message) {
+  apiErrorText.textContent = message;
+  apiError.hidden = false;
+}
+
+function hideApiError() {
+  apiError.hidden = true;
+  apiErrorText.textContent = "";
 }
 
 // 실제 존재하는 날짜의 YYYY-MM-DD인지 확인한다.
@@ -71,7 +122,7 @@ function validateTitle(rawTitle) {
   return { title };
 }
 
-// 제목·설명·우선순위·마감일 입력을 검사해 저장할 값으로 바꾼다.
+// 제목·설명·우선순위·마감일 입력을 검사해 API로 보낼 값으로 바꾼다. 서버도 같은 규칙으로 다시 검사한다.
 function validateTaskInput(input) {
   const titleResult = validateTitle(input.title);
   if (titleResult.error) {
@@ -97,111 +148,45 @@ function validateTaskInput(input) {
   };
 }
 
-// 저장값의 항목을 검사한다. T02·T03에서 저장한 항목처럼 새 필드가 없으면 기본값을 채운다.
-// 필드가 있는데 형식이 틀리면 null을 돌려 손상된 값으로 처리한다.
-function normalizeTask(task) {
-  if (
-    task === null ||
-    typeof task !== "object" ||
-    typeof task.id !== "string" ||
-    task.id.length === 0 ||
-    typeof task.title !== "string" ||
-    task.title.trim().length === 0 ||
-    task.title.length > TITLE_MAX_LENGTH ||
-    !TASK_STATUSES.includes(task.status) ||
-    typeof task.created_at !== "string"
-  ) {
-    return null;
-  }
-
-  const description = task.description === undefined ? "" : task.description;
-  const priority = task.priority === undefined ? "NORMAL" : task.priority;
-  const dueDate = task.due_date === undefined ? null : task.due_date;
-  if (
-    typeof description !== "string" ||
-    description.length > DESCRIPTION_MAX_LENGTH ||
-    !TASK_PRIORITIES.includes(priority) ||
-    (dueDate !== null && !isValidDateString(dueDate))
-  ) {
-    return null;
-  }
-
-  return {
-    id: task.id,
-    title: task.title,
-    description,
-    status: task.status,
-    priority,
-    due_date: dueDate,
-    created_at: task.created_at,
-  };
-}
-
 function findTask(id) {
   return tasks.find((task) => task.id === id);
 }
 
-function showStorageWarning(message) {
-  storageWarning.textContent = message;
-  storageWarning.hidden = false;
+function replaceTask(updated) {
+  tasks = tasks.map((task) => (task.id === updated.id ? updated : task));
 }
 
-function loadTasks() {
-  let raw;
+async function loadTasks() {
+  loadState = "loading";
+  renderTasks();
   try {
-    raw = window.localStorage.getItem(STORAGE_KEY);
-  } catch {
-    canSave = false;
-    showStorageWarning("브라우저 저장소를 사용할 수 없습니다. 새로고침하면 등록한 할 일이 사라집니다.");
-    return [];
+    tasks = await request("GET", "/api/tasks");
+    loadState = "ready";
+    hideApiError();
+  } catch (error) {
+    loadState = "error";
+    showApiError(`할 일 목록을 불러오지 못했습니다. ${getErrorMessage(error)}`);
   }
-
-  if (raw === null) {
-    return [];
+  if (editingId !== null && !findTask(editingId)) {
+    editingId = null;
+    editDraft = null;
   }
-
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      const normalized = parsed.map(normalizeTask);
-      if (normalized.every((task) => task !== null)) {
-        return normalized;
-      }
-    }
-  } catch {
-    // 아래에서 손상된 값으로 처리한다.
-  }
-
-  // 손상된 저장값은 자동으로 덮어쓰지 않는다.
-  canSave = false;
-  showStorageWarning(
-    `저장된 데이터(${STORAGE_KEY})가 손상되어 불러오지 못했습니다. ` +
-      "기존 값을 보호하기 위해 저장하지 않으며, 새로고침하면 새로 등록한 할 일이 사라집니다."
-  );
-  return [];
+  renderTasks();
 }
 
-function saveTasks() {
-  if (!canSave) {
-    return true;
+// 수정·삭제 대상이 서버에 없으면(404) 서버 목록을 다시 불러와 화면을 맞춘다.
+async function handleItemError(error) {
+  if (error instanceof ApiError && error.status === 404) {
+    await loadTasks();
   }
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-    return true;
-  } catch {
-    return false;
-  }
+  showApiError(getErrorMessage(error));
 }
 
-// 변경을 적용하고 저장한다. 저장에 실패하면 화면과 저장값이 어긋나지 않도록 되돌린다.
-function applyChange(change) {
-  const previous = tasks.map((task) => ({ ...task }));
-  change();
-  if (saveTasks()) {
-    return true;
+// 요청이 끝날 때까지 해당 영역의 입력과 버튼을 막아 중복 요청을 방지한다.
+function setBusy(container, busy) {
+  for (const control of container.querySelectorAll("button, input, select, textarea")) {
+    control.disabled = busy;
   }
-  tasks = previous;
-  return false;
 }
 
 // 제목 검색, 상태, 우선순위 조건을 모두 만족하는 항목만 남긴다(AND).
@@ -346,7 +331,7 @@ function renderTasks() {
   for (const task of visibleTasks) {
     const item = document.createElement("li");
     item.className = "task-item";
-    item.dataset.id = task.id;
+    item.dataset.id = String(task.id);
     item.dataset.status = task.status;
     if (isOverdue(task, today)) {
       item.classList.add("is-overdue");
@@ -358,7 +343,8 @@ function renderTasks() {
     }
     taskList.appendChild(item);
   }
-  emptyMessage.hidden = tasks.length > 0;
+  loadingMessage.hidden = loadState !== "loading";
+  emptyMessage.hidden = loadState !== "ready" || tasks.length > 0;
   filterEmptyMessage.hidden = tasks.length === 0 || visibleTasks.length > 0;
 }
 
@@ -381,8 +367,15 @@ function resetForm() {
   dueDateInput.value = "";
 }
 
-form.addEventListener("submit", (event) => {
+function getItemId(element) {
+  return Number(element.closest(".task-item").dataset.id);
+}
+
+form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (isSubmitting) {
+    return;
+  }
 
   const result = validateTaskInput({
     title: titleInput.value,
@@ -396,39 +389,41 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
-  const saved = applyChange(() => {
-    tasks.push({
-      id: createId(),
-      title: result.value.title,
-      description: result.value.description,
-      status: "TODO",
-      priority: result.value.priority,
-      due_date: result.value.due_date,
-      created_at: new Date().toISOString(),
-    });
-  });
-  if (!saved) {
-    formError.textContent = SAVE_ERROR_MESSAGE;
+  isSubmitting = true;
+  setBusy(form, true);
+  try {
+    const created = await request("POST", "/api/tasks", result.value);
+    formError.textContent = "";
+    resetForm();
+    if (loadState === "ready") {
+      tasks.push(created);
+      renderTasks();
+    } else {
+      // 처음 목록을 불러오지 못한 상태였다면 서버 목록 전체를 다시 받아 맞춘다.
+      await loadTasks();
+    }
+  } catch (error) {
+    // 실패하면 입력값을 그대로 두어 다시 시도할 수 있게 한다.
+    formError.textContent = getErrorMessage(error);
+  } finally {
+    isSubmitting = false;
+    setBusy(form, false);
     titleInput.focus();
-    return;
   }
-
-  formError.textContent = "";
-  resetForm();
-  titleInput.focus();
-  renderTasks();
 });
+
+retryButton.addEventListener("click", loadTasks);
 
 for (const filter of [filterSearch, filterStatus, filterPriority]) {
   filter.addEventListener("input", renderTasks);
 }
 
-taskList.addEventListener("click", (event) => {
+taskList.addEventListener("click", async (event) => {
   const button = event.target.closest("button[data-action]");
   if (!button) {
     return;
   }
-  const id = button.closest(".task-item").dataset.id;
+  const id = getItemId(button);
   const task = findTask(id);
   if (!task) {
     return;
@@ -454,18 +449,18 @@ taskList.addEventListener("click", (event) => {
     if (!window.confirm(`"${task.title}" 할 일을 삭제할까요?`)) {
       return;
     }
-    const saved = applyChange(() => {
+    setBusy(button.closest(".task-item"), true);
+    try {
+      await request("DELETE", `/api/tasks/${id}`);
       tasks = tasks.filter((item) => item.id !== id);
-    });
-    if (!saved) {
-      formError.textContent = SAVE_ERROR_MESSAGE;
-      return;
+      if (editingId === id) {
+        editingId = null;
+        editDraft = null;
+      }
+      hideApiError();
+    } catch (error) {
+      await handleItemError(error);
     }
-    if (editingId === id) {
-      editingId = null;
-      editDraft = null;
-    }
-    formError.textContent = "";
     renderTasks();
   }
 });
@@ -477,30 +472,31 @@ taskList.addEventListener("input", (event) => {
   }
 });
 
-taskList.addEventListener("change", (event) => {
+taskList.addEventListener("change", async (event) => {
   const select = event.target.closest(".task-status");
-  if (!select) {
+  if (!select || !TASK_STATUSES.includes(select.value)) {
     return;
   }
-  const id = select.closest(".task-item").dataset.id;
-  const saved = applyChange(() => {
-    const task = findTask(id);
-    if (task && TASK_STATUSES.includes(select.value)) {
-      task.status = select.value;
-    }
-  });
-  formError.textContent = saved ? "" : SAVE_ERROR_MESSAGE;
+  const id = getItemId(select);
+  setBusy(select.closest(".task-item"), true);
+  try {
+    replaceTask(await request("PATCH", `/api/tasks/${id}`, { status: select.value }));
+    hideApiError();
+  } catch (error) {
+    // 실패하면 서버에 저장된 원래 상태로 다시 그린다.
+    await handleItemError(error);
+  }
   renderTasks();
 });
 
-taskList.addEventListener("submit", (event) => {
+taskList.addEventListener("submit", async (event) => {
   const editForm = event.target.closest(".edit-form");
   if (!editForm) {
     return;
   }
   event.preventDefault();
 
-  const id = editForm.closest(".task-item").dataset.id;
+  const id = getItemId(editForm);
   const result = validateTaskInput(editDraft);
   if (result.error) {
     showEditError(editForm, result.error);
@@ -508,23 +504,24 @@ taskList.addEventListener("submit", (event) => {
     return;
   }
 
-  const saved = applyChange(() => {
-    const task = findTask(id);
-    if (task) {
-      Object.assign(task, result.value);
+  setBusy(editForm, true);
+  try {
+    replaceTask(await request("PATCH", `/api/tasks/${id}`, result.value));
+    editingId = null;
+    editDraft = null;
+    editError = "";
+    hideApiError();
+    renderTasks();
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      await handleItemError(error);
+      return;
     }
-  });
-  if (!saved) {
-    showEditError(editForm, SAVE_ERROR_MESSAGE);
+    // 실패하면 수정 중인 입력값을 그대로 두어 다시 시도할 수 있게 한다.
+    setBusy(editForm, false);
+    showEditError(editForm, getErrorMessage(error));
     editForm.querySelector(".edit-title").focus();
-    return;
   }
-
-  editingId = null;
-  editDraft = null;
-  editError = "";
-  renderTasks();
 });
 
-tasks = loadTasks();
-renderTasks();
+loadTasks();

@@ -1,6 +1,7 @@
 """Task Flow API.
 
 T07: 할 일 등록·조회·부분 수정·삭제와 목록 필터.
+T08: 개발용 화면(5500번 포트)에서 호출할 수 있도록 CORS를 허용한다.
 서버 메모리에 저장하므로 API를 재시작하면 데이터가 사라진다(DB는 T11부터).
 """
 
@@ -8,10 +9,21 @@ from datetime import datetime, timezone
 from threading import Lock
 
 from fastapi import FastAPI, HTTPException, Response, status
+from fastapi.middleware.cors import CORSMiddleware
 
 from backend.schemas import Priority, Status, Task, TaskCreate, TaskUpdate
 
 app = FastAPI(title="Task Flow API")
+
+# 화면(127.0.0.1:5500)과 API(127.0.0.1:8000)의 주소가 달라 브라우저가 막으므로 개발용 화면 주소만 허용한다.
+# 배포 단계(T14)에서는 Nginx가 같은 주소로 /api를 전달하므로 CORS가 필요 없다.
+DEV_FRONTEND_ORIGINS = ["http://127.0.0.1:5500", "http://localhost:5500"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=DEV_FRONTEND_ORIGINS,
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["Content-Type"],
+)
 
 # 메모리 저장소. 등록 순서대로 보관하고 id는 1부터 발급한다.
 _tasks: list[Task] = []
