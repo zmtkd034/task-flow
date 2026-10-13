@@ -30,8 +30,13 @@
   - 확인 결과(2026-10-13, Headless Chromium 자동 확인 49개 통과, T02·T03 회귀 통과): 기본값(설명 "", NORMAL, 마감 null) 저장, 설명 2000자 허용·2001자 거절, 없는 날짜 거절, 제목·설명 HTML 글자 표시. 어제 마감 TODO·DOING 지연 표시, DONE·오늘·내일·미지정은 표시 안 함, 완료로 바꾸면 사라짐. 제목 검색(대소문자 무시)·상태·우선순위 AND 적용, 결과 없음 안내. HIGH 필터 중 같은 제목 항목의 수정·상태 변경·삭제(취소/확인)가 id 기준으로 해당 항목에만 적용. T02·T03 형식 저장값은 경고 없이 기본값을 채워 불러오고, 새 필드 형식이 틀리면 손상으로 보고 덮어쓰지 않음. 375px 화면 가로 스크롤 없음.
   - 남은 오류: 없음. 지연 표시는 화면을 다시 그릴 때 계산하므로 페이지를 연 채 자정이 지나면 새로고침 또는 다른 조작 후 갱신된다.
 ## 3장: API
-- [ ] T05: API-SPEC.md 작성, FastAPI /api/health 구현.
+- [x] T05: API-SPEC.md 작성, FastAPI /api/health 구현.
   확인: curl로 200과 status=ok.
+  - 변경 파일: API-SPEC.md, backend/__init__.py, backend/main.py (신규), requirements.txt·.gitignore(사용자가 가상환경 준비 중 생성)
+  - 준비: python3 -m venv .venv, pip install fastapi uvicorn (fastapi 0.143.0, uvicorn 0.54.0), pip freeze > requirements.txt
+  - 실행 명령: .venv 활성화 후 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+  - 확인 결과(2026-10-13): curl -i http://127.0.0.1:8000/api/health → 200 OK, {"status":"ok"}. /docs 200, OpenAPI 경로는 /api/health만 존재. /api/tasks는 아직 404(T06에서 구현).
+  - 남은 오류: 없음. API-SPEC.md의 id는 서버 발급 정수로 정했다(프런트엔드 localStorage 단계의 문자열 id와 다르며, PRD에 따라 데이터는 이전하지 않는다).
 - [ ] T06: 메모리 기반 /api/tasks GET과 POST.
   확인: /docs에서 등록 후 조회. 입력 위반은 422.
 - [ ] T07: PATCH·DELETE와 필터 구현.
