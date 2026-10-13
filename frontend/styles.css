@@ -54,6 +54,20 @@ h1 {
   font-size: 14px;
 }
 
+.storage-warning {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 1px solid #f0c36d;
+  border-radius: 6px;
+  background: #fff8e1;
+  color: #6d4c00;
+  font-size: 14px;
+}
+
+.storage-warning[hidden] {
+  display: none;
+}
+
 .section-title {
   margin: 0 0 12px;
   padding-bottom: 8px;
