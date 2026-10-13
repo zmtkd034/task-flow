@@ -21,16 +21,55 @@ h1 {
 
 .task-form {
   display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
-.task-form input {
-  flex: 1;
-  min-width: 0;
+.form-row {
+  display: flex;
+  gap: 8px;
+}
+
+.task-form input,
+.task-form select,
+.task-form textarea,
+.filters input,
+.filters select {
   padding: 10px 12px;
+  font: inherit;
   font-size: 16px;
   border: 1px solid #ccc;
   border-radius: 6px;
+  background: #fff;
+  color: #222;
+}
+
+.task-form #task-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-form textarea {
+  resize: vertical;
+}
+
+.form-options {
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.form-options label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #555;
+}
+
+.form-options select,
+.form-options input {
+  padding: 6px 10px;
+  font-size: 14px;
 }
 
 .task-form button {
@@ -75,8 +114,30 @@ h1 {
   border-bottom: 2px solid #e2e4e8;
 }
 
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.filters input {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.filters input,
+.filters select {
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
 .empty-message {
   color: #777;
+}
+
+.empty-message[hidden] {
+  display: none;
 }
 
 .task-list {
@@ -101,9 +162,55 @@ h1 {
   gap: 8px 12px;
 }
 
-.task-title {
-  flex: 1 1 200px;
+.task-main {
+  flex: 1 1 240px;
   min-width: 0;
+}
+
+.task-title {
+  font-weight: 500;
+}
+
+.task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.badge {
+  padding: 1px 8px;
+  font-size: 12px;
+  border-radius: 999px;
+  background: #eef0f3;
+  color: #555;
+}
+
+.badge.priority-high {
+  background: #fde8e8;
+  color: #b42318;
+}
+
+.badge.priority-low {
+  background: #eef4ff;
+  color: #3a5a9a;
+}
+
+.badge.overdue {
+  background: #c62828;
+  color: #fff;
+  font-weight: 600;
+}
+
+.task-item.is-overdue {
+  border-left: 4px solid #c62828;
+}
+
+.task-description {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: #555;
+  white-space: pre-wrap;
 }
 
 .task-item[data-status="DONE"] .task-title {
@@ -118,7 +225,8 @@ h1 {
 
 .task-item select,
 .task-item button,
-.edit-form input {
+.edit-form input,
+.edit-form textarea {
   padding: 6px 10px;
   font-size: 14px;
   border: 1px solid #ccc;
@@ -141,13 +249,26 @@ h1 {
 
 .edit-form {
   display: flex;
+  flex-direction: column;
   flex: 1 1 100%;
   gap: 6px;
 }
 
-.edit-form input {
-  flex: 1;
+.edit-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.edit-form .edit-title {
+  flex: 1 1 160px;
   min-width: 0;
+}
+
+.edit-form textarea {
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
 }
 
 .edit-error {
