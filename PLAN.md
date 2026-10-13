@@ -37,8 +37,12 @@
   - 실행 명령: .venv 활성화 후 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
   - 확인 결과(2026-10-13): curl -i http://127.0.0.1:8000/api/health → 200 OK, {"status":"ok"}. /docs 200, OpenAPI 경로는 /api/health만 존재. /api/tasks는 아직 404(T06에서 구현).
   - 남은 오류: 없음. API-SPEC.md의 id는 서버 발급 정수로 정했다(프런트엔드 localStorage 단계의 문자열 id와 다르며, PRD에 따라 데이터는 이전하지 않는다).
-- [ ] T06: 메모리 기반 /api/tasks GET과 POST.
+- [x] T06: 메모리 기반 /api/tasks GET과 POST.
   확인: /docs에서 등록 후 조회. 입력 위반은 422.
+  - 변경 파일: backend/schemas.py(신규, 입력 검증), backend/main.py(메모리 저장소, GET·POST /api/tasks)
+  - 실행 명령: .venv 활성화 후 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+  - 확인 결과(2026-10-13): /docs(Swagger UI)에서 POST 201로 등록 후 GET 200으로 같은 항목 조회, 빈 제목 422. curl로 정상 7건 201(기본값 description ""·TODO·NORMAL·null, 제목 공백 제거, 100자·설명 2000자·2028-02-29 허용), 위반 20건 422(빈·공백·누락·null·숫자 제목, 101자, 설명 2001자·null, 잘못된 상태·소문자 상태·우선순위, 2026-02-30·슬래시·시간 포함·숫자 날짜, id·created_at·정의 안 된 필드 전송, 깨진 JSON, 배열 본문), 422 요청은 저장되지 않음. API 재시작 후 목록 []·id 1부터 다시 발급(메모리 단계 정상).
+  - 남은 오류: 없음. 목록 필터(q·status·priority)는 T07에서 구현한다.
 - [ ] T07: PATCH·DELETE와 필터 구현.
   확인: 미전달 필드 유지, 없는 ID 404, 삭제 204.
 - [ ] T08: 프런트엔드 저장 처리를 API 호출로 교체.
