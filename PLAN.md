@@ -93,8 +93,14 @@
   - 사전 확인: 별도 폴더·.env 파일 없음·환경 변수만(env -i) 조건에서 health 200·DB 목록 응답, 환경 변수 누락 시 변수 이름을 알려 주는 오류로 시작 중단.
   - 확인 결과(2026-10-13): 스크립트 출력 active (running), health {"status":"ok"}. systemctl show: active/running, enabled, User=taskflow, NRestarts=0. 프로세스 소유자 taskflow. 127.0.0.1:8001만 수신(외부 주소 172.24.119.18:8001 거절). /api/tasks가 DB 목록 응답. 일반 계정은 env 파일 읽기 불가, /opt/task-flow/app에 .env 없음, 배포 코드와 backend/ 동일, 서비스 로그에 비밀번호 미노출. 개발 서버(8000)는 영향 없음.
   - 남은 오류: 없음. 코드 변경 후에는 sudo bash deploy/install-app.sh를 다시 실행해야 App 서버에 반영된다. 자동 재시작(Restart=on-failure)은 설정만 확인했고 강제 종료 시험은 하지 않았다(root 권한 필요).
-- [ ] T14: Web 서버 Nginx와 정적 파일·/api 프록시 구성.
+- [x] T14: Web 서버 Nginx와 정적 파일·/api 프록시 구성.
   확인: Web 주소로 등록, DB 저장, App 재시작 후 유지.
+  - 변경 파일: deploy/nginx-task-flow.conf(신규, 80번 포트·정적 파일·/api/ → 127.0.0.1:8001 프록시·보안 헤더·요청 64k 제한), deploy/install-web.sh(신규, Nginx 설치·화면 복사·사이트 활성화·nginx -t 후 적용). 화면 코드는 T08의 같은 주소(/api) 호출 그대로라 변경 없음.
+  - 구성: Nginx 1.28.3, 화면 /var/www/task-flow(root 소유), 사이트 /etc/nginx/sites-available/task-flow.conf 활성화, 기본 안내 페이지 사이트 비활성화(파일은 sites-available에 남김), 부팅 시 자동 시작.
+  - 실행 명령: (사용자) sudo bash deploy/install-web.sh → 브라우저 http://localhost 에서 등록 → sudo systemctl restart task-flow-api → 새로고침
+  - 사전 확인: 같은 설정을 일반 계정 Nginx(127.0.0.1:8088)로 실행해 nginx -t 통과, 화면·JS·CSS 형식, /api 전달, /docs·/openapi.json·/.env·/backend 404, 보안 헤더, 64k 초과 413, 브라우저 등록·상태 변경 DB 반영·CSP 차단 없음 확인(시험 항목 삭제).
+  - 확인 결과(2026-10-13): 16:31:35 브라우저(http://localhost)에서 "집 가기" 등록 → Nginx 접근 로그 POST /api/tasks 201, App 로그 201, DB SELECT로 id 4 행 확인. 16:31:50 App 재시작(PID 33993 → 35313, journal Stopped/Started). 16:32:07 새로고침 GET /api/tasks 200, 목록에 "집 가기" 유지. 배포된 화면·Nginx 설정이 저장소 파일과 동일, nginx active·enabled.
+  - 남은 오류: 첫 실행 때 스크립트 마지막 확인이 Nginx reload 완료 전에 실행되어 health가 기본 사이트의 404로 표시됐다(실제 설정은 2초 뒤 정상 적용). 응답이 올 때까지 기다린 뒤 확인하도록 install-web.sh를 수정했다. HTTPS는 PRD 범위 밖이라 구성하지 않았다.
 ## 실행 기준
 T01~T04: python3 -m http.server 5500 --bind 127.0.0.1 --directory frontend
 T05~T11: 가상환경에서 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
