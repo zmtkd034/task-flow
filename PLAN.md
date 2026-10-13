@@ -71,8 +71,12 @@
   - 실행 명령: .venv 활성화 후 python -m backend.init_db
   - 확인 결과(2026-10-13): 1회차 "'tasks' 테이블을 만들었습니다.", 2회차 "이미 있어 그대로 두었습니다."(DROP 없음). SHOW CREATE TABLE: id INT AUTO_INCREMENT PK, title VARCHAR(100) NOT NULL, description VARCHAR(2000) NOT NULL DEFAULT '', status·priority VARCHAR(10) 기본값 TODO·NORMAL과 CHECK 제약, due_date DATE NULL, created_at DATETIME NOT NULL, utf8mb4_unicode_ci. 트랜잭션 안에서 확인 후 ROLLBACK: 기본값·한글·이모지·제목 100자·설명 2000자·윤년 허용, 잘못된 status·priority, 빈·공백 제목(4025), 제목 101자·설명 2001자(1406), 없는 날짜(1292), NULL(1048) 거절. 확인 후 행 0개, AUTO_INCREMENT 1로 되돌림. .env 값 누락 시 변수 이름을 알려 주는 오류, 비밀번호 오류(1045) 시 로그에 비밀번호 미노출, engine URL 출력 시 비밀번호 *** 처리.
   - 남은 오류: 없음. API는 아직 메모리 저장이며 T11에서 DB로 교체한다.
-- [ ] T11: API 메모리 저장을 DB로 교체.
+- [x] T11: API 메모리 저장을 DB로 교체.
   확인: 등록한 행을 SQL로 조회. API 재시작 후 데이터 유지.
+  - 변경 파일: backend/main.py(메모리 저장소 제거, 요청마다 DB 세션으로 GET·POST·PATCH·DELETE·필터 처리, DB 연결 실패 503), API-SPEC.md(503 추가)
+  - 실행 명령: .venv 활성화 후 python -m backend.init_db (테이블 확인) → python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+  - 확인 결과(2026-10-13): API로 등록한 "DB 저장 확인"(id 1)을 SQL SELECT로 조회(제목·설명·HIGH·2026-10-20·UTC created_at 일치). API 서버를 완전히 중지(연결 000)한 뒤 다시 실행해도 같은 목록 유지, 이후 등록은 id 2로 이어짐. T06 검증 규칙(정상 8건 201, 위반 18건 422, 422 미저장, 검색어 %·_ 글자 취급), T07 API 테스트(54개), T08 화면 연동 브라우저 테스트 모두 DB에서 통과(API 계약 유지). 잘못된 DB 포트로 띄운 임시 API는 /api/tasks에 503 {"detail":"Database unavailable"}, 로그에 비밀번호 미노출.
+  - 남은 오류: 없음. 메모리 단계 데이터는 PRD에 따라 이전하지 않았다(사용자가 등록한 "집 가기" 1건은 다시 등록 필요). 화면은 503을 "서버 오류가 발생했습니다(503)"로 표시한다.
 ## 5장: 서버 분리
 - [ ] T12: DB 서버 구성 후 App 서버에서 SELECT 1 확인.
 - [ ] T13: App 서버 코드·가상환경·환경변수·systemd 구성.

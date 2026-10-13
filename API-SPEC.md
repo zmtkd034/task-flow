@@ -53,6 +53,7 @@ PRD의 요구사항(F01~F09)을 API로 옮긴 계약이다. 구현 순서는 PLA
 |---|---|
 | `404 Not Found` | 해당 `id`의 할 일이 없음 |
 | `422 Unprocessable Entity` | 입력 규칙 위반(빈 제목, 101자 제목, 2001자 설명, 잘못된 상태·우선순위·날짜, 정의되지 않은 필드 등) |
+| `503 Service Unavailable` | DB에 연결할 수 없음(T11부터). 본문 `{"detail": "Database unavailable"}`, 접속 정보 등 내부 오류 내용은 보여 주지 않는다. |
 
 본문은 FastAPI 기본 형식을 따른다.
 
