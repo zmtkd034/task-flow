@@ -58,7 +58,12 @@
   - 확인 결과(2026-10-13, Headless Chromium + curl 자동 확인 43개 통과, T07 API 회귀 통과): 화면에서 등록·상태 변경·수정(마감일 지움 null)·삭제 후 curl 목록과 id·순서·제목 일치, curl로 등록한 항목이 새로고침 후 화면에 표시. 삭제 취소 시 API에 남음, 필터 중 수정·삭제가 id 기준 해당 항목에만 적용, 어제 마감 TODO 지연 표시, HTML 제목 글자 표시. 서버 422 시 안내·입력값 유지, 요청 중 재제출해도 1건만 등록, 다른 곳에서 삭제된 항목 조작 시 404 안내 후 목록 다시 불러옴. API를 실제로 중지하고 확인: 새로 연 화면은 "목록을 불러오지 못했습니다" 배너와 다시 불러오기 버튼(빈 목록 안내 대신), 등록 실패 안내·입력값 유지. 열린 화면에서는 상태 변경 실패 시 선택값 원래대로, 수정 실패 시 입력값 유지, 삭제 실패 시 항목 유지. API 재시작 후 다시 불러오기로 복구(메모리 단계라 목록 비어 있음). 허용하지 않은 Origin의 CORS 사전 요청은 400.
   - 남은 오류: 없음. 검색·필터는 받아 온 목록으로 화면에서 계산한다(API 필터는 T07에서 구현되어 있음). localStorage(task-flow-v1)의 예전 값은 읽거나 지우지 않고 그대로 둔다(PRD: 단계 간 자동 이전 없음).
 ## 4장: DB
-- [ ] T09: MariaDB 전용 사용자·DB와 .env 준비. 접속 확인.
+- [x] T09: MariaDB 전용 사용자·DB와 .env 준비. 접속 확인.
+  - 변경 파일: .env.example(신규, 가짜 값), .gitignore(.env 추가). .env는 사용자가 직접 작성(Git 제외, 권한 600).
+  - 준비(사용자, sudo mariadb): CREATE DATABASE task_flow(utf8mb4, utf8mb4_unicode_ci), CREATE USER 'task_flow_app'@'localhost', GRANT ALL PRIVILEGES ON task_flow.* (이 DB에만 권한). MariaDB 11.8.6은 이미 설치·실행 중이었다.
+  - 실행 명령: mariadb -h 127.0.0.1 -u task_flow_app -p task_flow -e "SELECT CURRENT_USER(), DATABASE();"
+  - 확인 결과(2026-10-13): 사용자 접속 결과 task_flow_app@localhost / task_flow. .env 값(DB_HOST·DB_PORT·DB_NAME·DB_USER·DB_PASSWORD)으로 비밀번호를 출력하지 않고 접속 성공, 문자셋 utf8mb4. git check-ignore로 .env가 Git에서 제외됨을 확인.
+  - 남은 오류: 없음. 현재 DB 비밀번호가 짧아 5장(서버 분리) 전에 12자 이상으로 바꾸는 것을 권장한다.
 - [ ] T10: backend/database.py, models.py, init_db.py 생성.
   확인: python -m backend.init_db 실행 후 tasks 테이블 확인.
 - [ ] T11: API 메모리 저장을 DB로 교체.
