@@ -78,7 +78,13 @@
   - 확인 결과(2026-10-13): API로 등록한 "DB 저장 확인"(id 1)을 SQL SELECT로 조회(제목·설명·HIGH·2026-10-20·UTC created_at 일치). API 서버를 완전히 중지(연결 000)한 뒤 다시 실행해도 같은 목록 유지, 이후 등록은 id 2로 이어짐. T06 검증 규칙(정상 8건 201, 위반 18건 422, 422 미저장, 검색어 %·_ 글자 취급), T07 API 테스트(54개), T08 화면 연동 브라우저 테스트 모두 DB에서 통과(API 계약 유지). 잘못된 DB 포트로 띄운 임시 API는 /api/tasks에 503 {"detail":"Database unavailable"}, 로그에 비밀번호 미노출.
   - 남은 오류: 없음. 메모리 단계 데이터는 PRD에 따라 이전하지 않았다(사용자가 등록한 "집 가기" 1건은 다시 등록 필요). 화면은 503을 "서버 오류가 발생했습니다(503)"로 표시한다.
 ## 5장: 서버 분리
-- [ ] T12: DB 서버 구성 후 App 서버에서 SELECT 1 확인.
+- [x] T12: DB 서버 구성 후 App 서버에서 SELECT 1 확인.
+  - 구성 방식: A안(한 컴퓨터에서 역할 분리). DB=MariaDB(127.0.0.1:3306), App=FastAPI(T13), Web=Nginx(T14).
+  - 변경 파일: 없음(PLAN 기록만). DB 서버 설정이 이미 요건을 만족해 변경하지 않았다.
+  - DB 서버 상태: MariaDB 11.8.6, bind-address=127.0.0.1(/etc/mysql/mariadb.conf.d/50-server.cnf), port 3306, skip_networking=0, 서비스 active·enabled(부팅 시 자동 시작), utf8mb4. 앱 계정 task_flow_app@localhost는 task_flow.*에만 권한.
+  - 실행 명령: .venv에서 backend.database의 engine으로 SELECT 1 실행(.env 설정 사용)
+  - 확인 결과(2026-10-13): SELECT 1 → 1(18 ms), 접속 계정 task_flow_app@localhost, DB task_flow, TCP 연결, tasks 테이블 확인. 외부 인터페이스 주소(eth0 172.24.119.18:3306) 접속 거절, 127.0.0.1:3306만 접속 가능. 실행 중인 API도 DB 목록을 응답.
+  - 남은 오류: 없음. 권장(선택): DB 비밀번호 12자 이상으로 변경, 운영용으로는 앱 계정 권한을 SELECT·INSERT·UPDATE·DELETE로 줄이고 테이블 생성은 별도 계정으로 실행.
 - [ ] T13: App 서버 코드·가상환경·환경변수·systemd 구성.
   확인: App에서 /api/health 응답.
 - [ ] T14: Web 서버 Nginx와 정적 파일·/api 프록시 구성.
