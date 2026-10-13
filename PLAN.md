@@ -85,8 +85,14 @@
   - 실행 명령: .venv에서 backend.database의 engine으로 SELECT 1 실행(.env 설정 사용)
   - 확인 결과(2026-10-13): SELECT 1 → 1(18 ms), 접속 계정 task_flow_app@localhost, DB task_flow, TCP 연결, tasks 테이블 확인. 외부 인터페이스 주소(eth0 172.24.119.18:3306) 접속 거절, 127.0.0.1:3306만 접속 가능. 실행 중인 API도 DB 목록을 응답.
   - 남은 오류: 없음. 권장(선택): DB 비밀번호 12자 이상으로 변경, 운영용으로는 앱 계정 권한을 SELECT·INSERT·UPDATE·DELETE로 줄이고 테이블 생성은 별도 계정으로 실행.
-- [ ] T13: App 서버 코드·가상환경·환경변수·systemd 구성.
+- [x] T13: App 서버 코드·가상환경·환경변수·systemd 구성.
   확인: App에서 /api/health 응답.
+  - 변경 파일: deploy/task-flow-api.service(신규, systemd 서비스), deploy/install-app.sh(신규, 설치·갱신 스크립트)
+  - 구성: 실행 계정 taskflow(시스템 계정, 로그인 불가), 코드 /opt/task-flow/app(backend·requirements.txt, root 소유·읽기 전용), 가상환경 /opt/task-flow/venv, 환경 변수 /etc/task-flow/task-flow.env(root:taskflow 640, EnvironmentFile로 전달), 서비스 task-flow-api(127.0.0.1:8001, Restart=on-failure, 부팅 시 자동 시작, ProtectSystem=strict·ProtectHome·NoNewPrivileges).
+  - 실행 명령: (사용자) sudo bash deploy/install-app.sh
+  - 사전 확인: 별도 폴더·.env 파일 없음·환경 변수만(env -i) 조건에서 health 200·DB 목록 응답, 환경 변수 누락 시 변수 이름을 알려 주는 오류로 시작 중단.
+  - 확인 결과(2026-10-13): 스크립트 출력 active (running), health {"status":"ok"}. systemctl show: active/running, enabled, User=taskflow, NRestarts=0. 프로세스 소유자 taskflow. 127.0.0.1:8001만 수신(외부 주소 172.24.119.18:8001 거절). /api/tasks가 DB 목록 응답. 일반 계정은 env 파일 읽기 불가, /opt/task-flow/app에 .env 없음, 배포 코드와 backend/ 동일, 서비스 로그에 비밀번호 미노출. 개발 서버(8000)는 영향 없음.
+  - 남은 오류: 없음. 코드 변경 후에는 sudo bash deploy/install-app.sh를 다시 실행해야 App 서버에 반영된다. 자동 재시작(Restart=on-failure)은 설정만 확인했고 강제 종료 시험은 하지 않았다(root 권한 필요).
 - [ ] T14: Web 서버 Nginx와 정적 파일·/api 프록시 구성.
   확인: Web 주소로 등록, DB 저장, App 재시작 후 유지.
 ## 실행 기준
