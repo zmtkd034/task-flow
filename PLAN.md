@@ -64,8 +64,13 @@
   - 실행 명령: mariadb -h 127.0.0.1 -u task_flow_app -p task_flow -e "SELECT CURRENT_USER(), DATABASE();"
   - 확인 결과(2026-10-13): 사용자 접속 결과 task_flow_app@localhost / task_flow. .env 값(DB_HOST·DB_PORT·DB_NAME·DB_USER·DB_PASSWORD)으로 비밀번호를 출력하지 않고 접속 성공, 문자셋 utf8mb4. git check-ignore로 .env가 Git에서 제외됨을 확인.
   - 남은 오류: 없음. 현재 DB 비밀번호가 짧아 5장(서버 분리) 전에 12자 이상으로 바꾸는 것을 권장한다.
-- [ ] T10: backend/database.py, models.py, init_db.py 생성.
+- [x] T10: backend/database.py, models.py, init_db.py 생성.
   확인: python -m backend.init_db 실행 후 tasks 테이블 확인.
+  - 변경 파일: backend/database.py(.env 읽기·엔진·세션), backend/models.py(tasks 테이블), backend/init_db.py(없는 테이블만 생성), requirements.txt
+  - 새 패키지: SQLAlchemy 2.1.4(테이블 정의·DB 사용), PyMySQL 1.2.3(MariaDB 드라이버, 순수 Python), python-dotenv 1.2.4(.env 읽기)
+  - 실행 명령: .venv 활성화 후 python -m backend.init_db
+  - 확인 결과(2026-10-13): 1회차 "'tasks' 테이블을 만들었습니다.", 2회차 "이미 있어 그대로 두었습니다."(DROP 없음). SHOW CREATE TABLE: id INT AUTO_INCREMENT PK, title VARCHAR(100) NOT NULL, description VARCHAR(2000) NOT NULL DEFAULT '', status·priority VARCHAR(10) 기본값 TODO·NORMAL과 CHECK 제약, due_date DATE NULL, created_at DATETIME NOT NULL, utf8mb4_unicode_ci. 트랜잭션 안에서 확인 후 ROLLBACK: 기본값·한글·이모지·제목 100자·설명 2000자·윤년 허용, 잘못된 status·priority, 빈·공백 제목(4025), 제목 101자·설명 2001자(1406), 없는 날짜(1292), NULL(1048) 거절. 확인 후 행 0개, AUTO_INCREMENT 1로 되돌림. .env 값 누락 시 변수 이름을 알려 주는 오류, 비밀번호 오류(1045) 시 로그에 비밀번호 미노출, engine URL 출력 시 비밀번호 *** 처리.
+  - 남은 오류: 없음. API는 아직 메모리 저장이며 T11에서 DB로 교체한다.
 - [ ] T11: API 메모리 저장을 DB로 교체.
   확인: 등록한 행을 SQL로 조회. API 재시작 후 데이터 유지.
 ## 5장: 서버 분리
