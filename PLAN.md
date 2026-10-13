@@ -8,6 +8,7 @@
   - 변경 파일: frontend/index.html, frontend/styles.css, frontend/app.js (신규)
   - 실행 명령: python3 -m http.server 5500 --bind 127.0.0.1 --directory frontend
   - 확인 결과(2026-10-13, Headless Chromium 자동 확인): 두 항목 등록, 앞뒤 공백 제거, 빈 제목·공백 제목·101자 거절과 오류 문구 표시, 100자 등록, `<img ...>` 입력이 실행되지 않고 글자로 표시, 새로고침 시 목록 사라짐, JS 오류 없음.
+  - 추가 요청: 입력 폼과 목록 사이에 '할 일 목록' 제목 추가. 빈 상태·등록 후 모두 표시되고 순서(입력 → 제목 → 목록) 확인.
   - 남은 오류: 없음. 각 항목은 id·title·status(TODO)·created_at을 가지며 화면에는 제목만 표시한다.
 - [ ] T02: localStorage(task-flow-v1) 저장·복원.
   확인: 새로고침 후 유지. 손상된 저장값을 자동 덮어쓰지 않는다.
