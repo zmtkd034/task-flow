@@ -49,6 +49,7 @@
   - 변경 파일: backend/schemas.py(TaskUpdate: 부분 수정 검증), backend/main.py(PATCH·DELETE /api/tasks/{id}, GET 필터 q·status·priority)
   - 실행 명령: .venv 활성화 후 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
   - 확인 결과(2026-10-13, HTTP 요청 자동 확인 54개 통과 + curl): status만 PATCH 시 나머지 필드 유지, 여러 필드 동시 수정, due_date null로 마감일 삭제, {}는 변경 없음, 다른 항목·순서·id·created_at 불변. title·description·status·priority null, 빈·101자 제목, 2001자 설명, 잘못된 값·날짜, id·created_at·정의 안 된 필드, 유효+무효 혼합은 422이며 일부만 적용되지 않음. 없는 id PATCH·DELETE 404, 숫자 아닌 id 422. DELETE 204(본문 없음), 해당 항목만 삭제, 재삭제 404, 삭제된 id 재사용 안 함. 필터 q(대소문자 무시·공백 제거, 제목만)·status·priority AND, 결과 없음 200 [], 잘못된 status·priority 422.
+  - 사용자 확인(2026-10-13): /docs에서 PATCH 200(상태만 변경), DELETE 204, 같은 id 재삭제 404 정상.
   - 남은 오류: 없음.
 - [ ] T08: 프런트엔드 저장 처리를 API 호출로 교체.
   확인: 화면과 curl 목록이 같음. API 중지 시 오류 표시.
