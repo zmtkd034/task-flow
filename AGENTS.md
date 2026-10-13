@@ -8,7 +8,7 @@
 - 문서 간 요구가 충돌하면 충돌 항목을 설명하고 확인한 뒤 진행한다.
 
 ## 구현 범위
-- HTML/CSS/JavaScript로 시작하고 PLAN의 해당 단계에서 FastAPI와 Mriadb을 도입한다.
+- HTML/CSS/JavaScript로 시작하고 PLAN의 해당 단계에서 FastAPI와 Mariadb을 도입한다.
 - React, Docker, Kubernetes나 새로운 기능을 임의로 추가하지 않는다.
 - 기존 정상 기능과 API 계약을 유지하고 요청 범위를 벗어난 파일은 변경하지 않는다.
 - 큰 기능은 작은 작업으로 나누고 현재 작업부터 구현한다.
