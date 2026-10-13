@@ -94,6 +94,73 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.task-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.task-title {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.task-item[data-status="DONE"] .task-title {
+  color: #888;
+  text-decoration: line-through;
+}
+
+.task-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.task-item select,
+.task-item button,
+.edit-form input {
+  padding: 6px 10px;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  color: #222;
+}
+
+.task-item button {
+  cursor: pointer;
+}
+
+.task-item button:hover {
+  background: #f0f2f5;
+}
+
+.task-item button[data-action="delete"] {
+  color: #c62828;
+}
+
+.edit-form {
+  display: flex;
+  flex: 1 1 100%;
+  gap: 6px;
+}
+
+.edit-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.edit-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: #c62828;
+  font-size: 13px;
+}
+
+.edit-error:empty {
+  display: none;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
