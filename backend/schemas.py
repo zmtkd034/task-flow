@@ -1,4 +1,4 @@
-"""요청·응답 데이터 형식과 입력 검증 규칙(API-SPEC.md의 Task)."""
+"""요청·응답 데이터 형식과 입력 검증 규칙(API-SPEC.md의 Task·User)."""
 
 import re
 from datetime import date
@@ -9,6 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 TITLE_MAX_LENGTH = 100
 DESCRIPTION_MAX_LENGTH = 2000
 DUE_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+USERNAME_PATTERN = r"^[a-z0-9]{4,20}$"
+PASSWORD_MIN_LENGTH = 8
+PASSWORD_MAX_LENGTH = 64
 
 Status = Literal["TODO", "DOING", "DONE"]
 Priority = Literal["HIGH", "NORMAL", "LOW"]
@@ -81,4 +84,19 @@ class Task(BaseModel):
     status: Status
     priority: Priority
     due_date: str | None
+    created_at: str
+
+
+class SignupRequest(BaseModel):
+    # 아이디는 공백 제거·소문자 변환 없이 그대로 검사한다. 비밀번호는 앞뒤 공백도 비밀번호로 본다.
+    model_config = ConfigDict(extra="forbid")
+
+    username: str = Field(pattern=USERNAME_PATTERN)
+    password: str = Field(min_length=PASSWORD_MIN_LENGTH, max_length=PASSWORD_MAX_LENGTH)
+
+
+class User(BaseModel):
+    # 비밀번호와 해시는 응답에 넣지 않는다.
+    id: int
+    username: str
     created_at: str

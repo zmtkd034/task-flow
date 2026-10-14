@@ -117,8 +117,13 @@
   - 실행 명령: .venv 활성화 후 python -m backend.init_db
   - 확인 결과(2026-10-14): 실행 전 tasks 1건(id 6 "바이브코딩"), AUTO_INCREMENT 7 기록. 1회차 users·sessions 생성, tasks 그대로, user_id 열 추가. 2회차 모두 "이미 있어 그대로 두었습니다". SHOW CREATE TABLE로 열·UNIQUE·CHECK·외래 키·인덱스 확인. 기존 행 id 6 내용 그대로, user_id NULL. 트랜잭션 안에서 확인 후 ROLLBACK(18개 통과): 아이디 4자·20자·소문자+숫자 허용, 중복(1062)·대문자·3자·공백·한글·특수문자(4025)·21자(1406)·password_hash NULL(1048) 거절, 세션 정상 허용·token_hash 중복(1062)·없는 사용자(1452)·user_id NULL(1048) 거절, 할 일 주인 있음·NULL 허용·없는 사용자(1452) 거절. 확인 후 users·sessions 0건, AUTO_INCREMENT 원래대로. 임시 API(8010, 현재 코드)로 기존 할 일 API 확인: GET 200(id 6 표시), 빈 제목·user_id 전송 422, POST 201(DB user_id NULL)·PATCH 200·HIGH 필터·DELETE 204, 시험 항목 삭제 후 AUTO_INCREMENT 7로 되돌림. 배포 App(8001, 이전 코드)·Web(localhost) /api/tasks 정상 응답(새 열 추가 후에도 영향 없음).
   - 남은 오류: 없음. API는 아직 user_id를 쓰지 않아 새 할 일은 주인 없음(NULL)으로 저장된다. T19 이후 주인 없는 할 일(현재 id 6 포함)은 누구에게도 보이지 않는다(PRD, 삭제하지 않음).
-- [ ] T17: 회원가입 API. 비밀번호는 표준 라이브러리 hashlib.scrypt와 사용자별 salt로 해시해 저장한다(새 패키지 없음).
+- [x] T17: 회원가입 API. 비밀번호는 표준 라이브러리 hashlib.scrypt와 사용자별 salt로 해시해 저장한다(새 패키지 없음).
   확인: 정상 201, 규칙 위반 422, 중복 아이디 409. DB에 비밀번호 원문이 없다.
+  - 변경 파일: backend/schemas.py(SignupRequest·User), backend/security.py(신규, hash_password·verify_password), backend/main.py(POST /api/auth/signup, 인증 API 422에서 input 제거), API-SPEC.md(422 input 미포함 설명)
+  - 해시: scrypt(n=16384, r=8, p=1, 32바이트), salt 16바이트, 저장 형식 scrypt$n$r$p$salt$hash. 새 패키지 없음.
+  - 실행 명령: .venv 활성화 후 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload (확인은 임시 8010번에서 함)
+  - 확인 결과(2026-10-14, HTTP 요청 자동 확인 32개 통과): 정상 가입 201(응답 id·username·created_at만, 비밀번호·쿠키 없음), 아이디 4자·20자·비밀번호 8자·64자·앞뒤 공백·한글·특수문자 비밀번호 201. 중복 아이디 409 {"detail":"Username already exists"}. 대문자·3자·21자·앞뒤/가운데 공백·한글·밑줄·끝 줄바꿈·빈 값·숫자·null·누락 아이디, 7자·65자·숫자·null·누락 비밀번호, 정의 안 된 필드·password_hash 전송·배열 본문·깨진 JSON 422. DB: 해시 형식 일치, 원문 없음, salt 모두 다름, verify_password로 맞는/틀린 비밀번호·앞뒤 공백 구분·깨진 해시 확인. 처음 확인 때 422 응답에 보낸 비밀번호(input)가 그대로 나오는 것을 발견해, 인증 API만 input을 빼도록 고친 뒤 비밀번호 미노출 확인(할 일 API 422 형식은 그대로). 서버 로그에 비밀번호 없음. 할 일 API GET 200·빈 제목 422·없는 id 404, /docs에 signup 표시. 시험 계정 삭제 후 users 0건·AUTO_INCREMENT 1, tasks 그대로. 배포 App(8001)·Web 정상.
+  - 남은 오류: 없음. 배포본에는 아직 반영하지 않았다(T21). verify_password는 T18 로그인에서 사용한다.
 - [ ] T18: 로그인·로그아웃·현재 사용자 API. 로그인 상태는 DB 세션과 HttpOnly·SameSite=Lax 쿠키로 유지한다.
   확인: 로그인 성공 시 쿠키 발급, 틀린 아이디·비밀번호 모두 같은 401 메시지, 로그아웃 후 같은 쿠키로 401, API 재시작 후에도 로그인 유지.
 - [ ] T19: 할 일 API에 로그인 필수와 사용자별 분리를 적용한다.
