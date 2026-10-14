@@ -106,7 +106,8 @@
   - 변경 파일: backend/main.py(프로젝트에 frontend/가 있으면 / 로 화면 제공, CORS 제거), frontend/app.js(API_BASE를 같은 주소로 고정), API-SPEC.md(CORS 설명을 같은 주소 제공으로 변경), PLAN.md(실행 기준)
   - 실행 명령: 가상환경에서 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload → http://127.0.0.1:8000
   - 확인 결과(2026-10-13): 8000에서 /·index.html·app.js·styles.css(올바른 형식)·/api/health·/api/tasks·/docs 200, 없는 API·파일 404. 다른 주소(5500)의 CORS 사전 요청은 허용되지 않음(405). 브라우저로 8000 사용 시 API를 같은 주소로만 호출, 등록·상태 변경·수정·삭제 취소/확인·검색 정상, 기존 DB 데이터 불변, JS 오류 없음. 배포 조건(frontend/ 없는 별도 폴더)에서는 / 404·/api/health 200으로 API만 제공. 배포 App(8001)·Web(localhost) 정상 응답 유지. 5500 서버 종료.
-  - 남은 오류: 없음. 배포본(/opt/task-flow, /var/www/task-flow)은 이전 코드라 동작은 같지만 저장소와 맞추려면 sudo bash deploy/install-app.sh, sudo bash deploy/install-web.sh를 다시 실행한다.
+  - 배포본 반영(2026-10-14): 사용자가 sudo bash deploy/install-app.sh, sudo bash deploy/install-web.sh 실행. 확인 결과: /opt/task-flow/app/backend·/var/www/task-flow가 저장소 backend/·frontend/와 차이 없음, task-flow-api·nginx active(App 10:43 재시작), 8001 /api/health {"status":"ok"}·/ 404(API만 제공), localhost /·app.js·styles.css·/api/health·/api/tasks 200·없는 API 404, 배포 app.js가 같은 주소 호출(API_BASE ""). 브라우저 조작은 확인하지 않았다.
+  - 남은 오류: 없음. 반영 후 /api/tasks는 빈 목록이었다(스크립트는 DB를 변경하지 않으며 반영 전 건수 기록은 없음).
 ## 실행 기준
 개발 서버(화면+API, 통합 후): 가상환경에서 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload → http://127.0.0.1:8000
 배포(Web·App·DB): http://localhost (sudo bash deploy/install-app.sh, sudo bash deploy/install-web.sh로 반영)
