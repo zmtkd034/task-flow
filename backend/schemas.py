@@ -95,6 +95,14 @@ class SignupRequest(BaseModel):
     password: str = Field(min_length=PASSWORD_MIN_LENGTH, max_length=PASSWORD_MAX_LENGTH)
 
 
+class LoginRequest(BaseModel):
+    # 아이디·비밀번호 규칙은 검사하지 않는다. 규칙에 맞지 않아도 422가 아니라 로그인 실패(401)로 처리한다.
+    model_config = ConfigDict(extra="forbid")
+
+    username: str
+    password: str
+
+
 class User(BaseModel):
     # 비밀번호와 해시는 응답에 넣지 않는다.
     id: int

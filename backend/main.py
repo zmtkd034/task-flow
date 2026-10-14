@@ -6,29 +6,50 @@ T11: 할 일을 MariaDB(tasks 테이블)에 저장한다. API를 재시작해도
      실행 전에 python -m backend.init_db로 테이블을 만들어 둔다.
 개발 서버 통합: 프로젝트에 frontend/가 있으면 화면도 같은 주소로 제공한다(개발 서버 하나로 화면+API).
 T17: 회원가입(POST /api/auth/signup). 비밀번호는 해시로만 저장한다.
+T18: 로그인·로그아웃·현재 사용자. 로그인 상태는 DB 세션과 HttpOnly 쿠키로 유지한다.
 """
 
 from collections.abc import Iterator
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
+from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from backend.database import SessionLocal
-from backend.models import TaskRow, UserRow
-from backend.schemas import Priority, SignupRequest, Status, Task, TaskCreate, TaskUpdate, User
-from backend.security import hash_password
+from backend.models import SessionRow, TaskRow, UserRow
+from backend.schemas import (
+    PASSWORD_MAX_LENGTH,
+    LoginRequest,
+    Priority,
+    SignupRequest,
+    Status,
+    Task,
+    TaskCreate,
+    TaskUpdate,
+    User,
+)
+from backend.security import (
+    hash_password,
+    hash_session_token,
+    new_session_token,
+    verify_dummy_password,
+    verify_password,
+)
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+SESSION_COOKIE = "task_flow_session"
+SESSION_MAX_AGE = timedelta(days=7)
+# HTTP 배포(http://localhost)에서도 동작하도록 Secure는 붙이지 않는다(API-SPEC 인증 참고).
+SESSION_COOKIE_OPTIONS = {"path": "/api", "httponly": True, "samesite": "lax", "secure": False}
 
 app = FastAPI(title="Task Flow API")
 
@@ -54,6 +75,28 @@ def get_session() -> Iterator[Session]:
 
 
 SessionDep = Annotated[Session, Depends(get_session)]
+SessionCookie = Annotated[str | None, Cookie(alias=SESSION_COOKIE)]
+
+
+def _find_session(session: Session, token: str | None) -> SessionRow | None:
+    # 만료된 세션은 없는 것으로 본다.
+    if not token:
+        return None
+    return session.scalar(
+        select(SessionRow).where(
+            SessionRow.token_hash == hash_session_token(token), SessionRow.expires_at > _utc_now()
+        )
+    )
+
+
+def get_current_user(session: SessionDep, token: SessionCookie = None) -> UserRow:
+    found = _find_session(session, token)
+    if found is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    return session.get(UserRow, found.user_id)
+
+
+CurrentUser = Annotated[UserRow, Depends(get_current_user)]
 
 
 def _to_task(row: TaskRow) -> Task:
@@ -108,6 +151,54 @@ def signup(payload: SignupRequest, session: SessionDep) -> User:
         session.rollback()
         raise username_taken from None
     return _to_user(row)
+
+
+@app.post("/api/auth/login")
+def login(payload: LoginRequest, response: Response, session: SessionDep, token: SessionCookie = None) -> User:
+    # 없는 아이디와 틀린 비밀번호를 같은 401로 응답한다(무엇이 틀렸는지 알려 주지 않는다).
+    invalid = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+    if len(payload.password) > PASSWORD_MAX_LENGTH:
+        # 가입 규칙보다 긴 비밀번호는 맞을 수 없으므로 해시 계산 없이 거절한다.
+        raise invalid
+    user = session.scalar(select(UserRow).where(UserRow.username == payload.username))
+    if user is None:
+        verify_dummy_password(payload.password)
+        raise invalid
+    if not verify_password(payload.password, user.password_hash):
+        raise invalid
+
+    # 이미 로그인한 쿠키가 있으면 그 세션은 지우고 새 세션을 만든다.
+    old = _find_session(session, token)
+    if old is not None:
+        session.delete(old)
+    new_token = new_session_token()
+    now = _utc_now()
+    session.add(
+        SessionRow(
+            token_hash=hash_session_token(new_token), user_id=user.id, created_at=now, expires_at=now + SESSION_MAX_AGE
+        )
+    )
+    session.commit()
+    response.set_cookie(
+        SESSION_COOKIE, new_token, max_age=int(SESSION_MAX_AGE.total_seconds()), **SESSION_COOKIE_OPTIONS
+    )
+    return _to_user(user)
+
+
+@app.post("/api/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(session: SessionDep, token: SessionCookie = None) -> Response:
+    # 로그인하지 않았거나 이미 로그아웃했어도 204로 응답한다.
+    if token:
+        session.execute(delete(SessionRow).where(SessionRow.token_hash == hash_session_token(token)))
+        session.commit()
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.delete_cookie(SESSION_COOKIE, **SESSION_COOKIE_OPTIONS)
+    return response
+
+
+@app.get("/api/auth/me")
+def me(user: CurrentUser) -> User:
+    return _to_user(user)
 
 
 @app.get("/api/tasks")

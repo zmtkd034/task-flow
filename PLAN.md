@@ -124,8 +124,12 @@
   - 실행 명령: .venv 활성화 후 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload (확인은 임시 8010번에서 함)
   - 확인 결과(2026-10-14, HTTP 요청 자동 확인 32개 통과): 정상 가입 201(응답 id·username·created_at만, 비밀번호·쿠키 없음), 아이디 4자·20자·비밀번호 8자·64자·앞뒤 공백·한글·특수문자 비밀번호 201. 중복 아이디 409 {"detail":"Username already exists"}. 대문자·3자·21자·앞뒤/가운데 공백·한글·밑줄·끝 줄바꿈·빈 값·숫자·null·누락 아이디, 7자·65자·숫자·null·누락 비밀번호, 정의 안 된 필드·password_hash 전송·배열 본문·깨진 JSON 422. DB: 해시 형식 일치, 원문 없음, salt 모두 다름, verify_password로 맞는/틀린 비밀번호·앞뒤 공백 구분·깨진 해시 확인. 처음 확인 때 422 응답에 보낸 비밀번호(input)가 그대로 나오는 것을 발견해, 인증 API만 input을 빼도록 고친 뒤 비밀번호 미노출 확인(할 일 API 422 형식은 그대로). 서버 로그에 비밀번호 없음. 할 일 API GET 200·빈 제목 422·없는 id 404, /docs에 signup 표시. 시험 계정 삭제 후 users 0건·AUTO_INCREMENT 1, tasks 그대로. 배포 App(8001)·Web 정상.
   - 남은 오류: 없음. 배포본에는 아직 반영하지 않았다(T21). verify_password는 T18 로그인에서 사용한다.
-- [ ] T18: 로그인·로그아웃·현재 사용자 API. 로그인 상태는 DB 세션과 HttpOnly·SameSite=Lax 쿠키로 유지한다.
+- [x] T18: 로그인·로그아웃·현재 사용자 API. 로그인 상태는 DB 세션과 HttpOnly·SameSite=Lax 쿠키로 유지한다.
   확인: 로그인 성공 시 쿠키 발급, 틀린 아이디·비밀번호 모두 같은 401 메시지, 로그아웃 후 같은 쿠키로 401, API 재시작 후에도 로그인 유지.
+  - 변경 파일: backend/schemas.py(LoginRequest), backend/security.py(세션 값 생성·SHA-256 해시, 없는 아이디용 더미 해시 확인), backend/main.py(POST /api/auth/login·logout, GET /api/auth/me, 로그인 확인 의존성 get_current_user — T19에서 할 일 API에 사용)
+  - 실행 명령: .venv 활성화 후 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload (확인은 임시 8010번에서 함)
+  - 확인 결과(2026-10-14, HTTP 요청 자동 확인 47개 통과 + T17 회귀 32개 통과): 로그인 200·User 응답(비밀번호 없음), 쿠키 task_flow_session HttpOnly·SameSite=Lax·Path=/api·Max-Age=604800·Secure 없음, 세션 값 43자, DB에는 SHA-256 해시만·만료 7일. me 로그인 200, 쿠키 없음·가짜·빈 쿠키 401 Not authenticated. 틀린 비밀번호·없는 아이디·다른 사용자 비밀번호·대문자·앞뒤 공백·짧은·65자·빈 값 모두 같은 401 Invalid username or password·쿠키 없음, 실패 시 세션 안 생김. 필드 누락·숫자·null·정의 안 된 필드·깨진 JSON 422(보낸 값 미포함). 틀린 비밀번호·없는 아이디 응답 시간 비슷(약 33ms). 다른 곳 로그인해도 기존 세션 유지, 같은 쿠키로 재로그인 시 이전 세션 401. 로그아웃 204·쿠키 만료(Max-Age=0)·DB 세션 삭제·같은 쿠키 401, 이미 로그아웃·쿠키 없음·가짜 쿠키 로그아웃도 204, 다른 세션은 영향 없음. 만료된 세션 401. 임시 API를 재시작(PID 변경)한 뒤 같은 쿠키로 me 200(로그인 유지). 서버 로그에 비밀번호·세션 값 없음. 할 일 API는 아직 로그인 없이 기존대로 동작(GET 200·빈 제목 422·없는 id 404). 시험 계정·세션 삭제 후 users·sessions 0건, tasks 그대로. 배포 App(8001)·Web 정상.
+  - 남은 오류: 없음. 만료된 세션 행은 자동으로 지우지 않는다(로그인 상태로 보지 않을 뿐이며, 그 쿠키로 로그아웃할 때만 지워진다). 배포본 반영은 T21.
 - [ ] T19: 할 일 API에 로그인 필수와 사용자별 분리를 적용한다.
   확인: 비로그인 401. 사용자 A·B가 각자 등록하면 서로의 목록에 보이지 않고, 다른 사용자 id로 PATCH·DELETE 시 404이며 데이터가 바뀌지 않는다. 소유자 없는 기존 행은 누구에게도 보이지 않는다. T07 검증 규칙 회귀 통과.
 - [ ] T20: 화면에 회원가입·로그인·로그아웃을 추가한다.
