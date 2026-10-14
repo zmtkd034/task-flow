@@ -7,6 +7,7 @@ T11: 할 일을 MariaDB(tasks 테이블)에 저장한다. API를 재시작해도
 개발 서버 통합: 프로젝트에 frontend/가 있으면 화면도 같은 주소로 제공한다(개발 서버 하나로 화면+API).
 T17: 회원가입(POST /api/auth/signup). 비밀번호는 해시로만 저장한다.
 T18: 로그인·로그아웃·현재 사용자. 로그인 상태는 DB 세션과 HttpOnly 쿠키로 유지한다.
+T19: 할 일 API는 로그인이 필요하며, 로그인한 사용자의 할 일만 다룬다.
 """
 
 from collections.abc import Iterator
@@ -62,6 +63,15 @@ def database_unavailable(request: Request, exc: OperationalError) -> JSONRespons
 
 @app.exception_handler(RequestValidationError)
 async def hide_auth_input(request: Request, exc: RequestValidationError) -> JSONResponse:
+    # 할 일 API는 입력 검증보다 로그인 확인이 먼저다. 깨진 JSON처럼 로그인 확인 전에 나는 422도 비로그인이면 401로 바꾼다.
+    if request.url.path.startswith("/api/tasks"):
+        try:
+            with SessionLocal() as session:
+                logged_in = _find_session(session, request.cookies.get(SESSION_COOKIE)) is not None
+        except OperationalError as error:
+            return database_unavailable(request, error)
+        if not logged_in:
+            return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"detail": "Not authenticated"})
     # 인증 API의 422에는 보낸 값(input, 비밀번호 포함)을 되돌려 주지 않는다. 다른 API는 기본 형식 그대로다.
     if not request.url.path.startswith("/api/auth/"):
         return await request_validation_exception_handler(request, exc)
@@ -124,9 +134,10 @@ def _to_date(value: str | None) -> date | None:
     return date.fromisoformat(value) if value else None
 
 
-def _get_row(session: Session, task_id: int) -> TaskRow:
+def _get_row(session: Session, task_id: int, user: UserRow) -> TaskRow:
+    # 다른 사용자의 할 일과 주인 없는 할 일은 없는 것과 똑같이 404로 응답한다.
     row = session.get(TaskRow, task_id)
-    if row is None:
+    if row is None or row.user_id != user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
     return row
 
@@ -203,13 +214,14 @@ def me(user: CurrentUser) -> User:
 
 @app.get("/api/tasks")
 def list_tasks(
+    user: CurrentUser,
     session: SessionDep,
     q: str | None = None,
     status: Status | None = None,
     priority: Priority | None = None,
 ) -> list[Task]:
     # 제목 검색·상태·우선순위를 모두 만족하는 항목만 등록 순서대로 돌려준다(AND).
-    query = select(TaskRow).order_by(TaskRow.id)
+    query = select(TaskRow).where(TaskRow.user_id == user.id).order_by(TaskRow.id)
     keyword = (q or "").strip()
     if keyword:
         # 테이블 정렬 규칙(utf8mb4_unicode_ci)이 대소문자를 구분하지 않는다. %, _는 글자로 찾는다.
@@ -222,8 +234,9 @@ def list_tasks(
 
 
 @app.post("/api/tasks", status_code=status.HTTP_201_CREATED)
-def create_task(payload: TaskCreate, session: SessionDep) -> Task:
+def create_task(user: CurrentUser, payload: TaskCreate, session: SessionDep) -> Task:
     row = TaskRow(
+        user_id=user.id,
         title=payload.title,
         description=payload.description,
         status=payload.status,
@@ -238,8 +251,8 @@ def create_task(payload: TaskCreate, session: SessionDep) -> Task:
 
 
 @app.patch("/api/tasks/{task_id}")
-def update_task(task_id: int, payload: TaskUpdate, session: SessionDep) -> Task:
-    row = _get_row(session, task_id)
+def update_task(user: CurrentUser, task_id: int, payload: TaskUpdate, session: SessionDep) -> Task:
+    row = _get_row(session, task_id, user)
     # 보낸 필드만 바꾸고 보내지 않은 필드는 그대로 둔다.
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(row, field, _to_date(value) if field == "due_date" else value)
@@ -248,8 +261,8 @@ def update_task(task_id: int, payload: TaskUpdate, session: SessionDep) -> Task:
 
 
 @app.delete("/api/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_task(task_id: int, session: SessionDep) -> Response:
-    session.delete(_get_row(session, task_id))
+def delete_task(user: CurrentUser, task_id: int, session: SessionDep) -> Response:
+    session.delete(_get_row(session, task_id, user))
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
