@@ -142,8 +142,12 @@
   - 실행 명령: .venv 활성화 후 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload → http://127.0.0.1:8000 (확인은 임시 8010번에서 함)
   - 확인 결과(2026-10-14, Headless Chromium 자동 확인 37개 통과): 비로그인 시 로그인 화면, 회원가입 화면 전환, 화면 검증(대문자·3자 아이디, 7자·65자 비밀번호) 시 서버로 보내지 않음, 가입 성공 시 로그인 화면·완료 안내·아이디 채움·비밀번호 칸 비움, 중복 아이디 안내, 틀린 비밀번호·빈 입력 안내. 로그인 후 할 일 화면·"아이디님" 표시, 주인 없는 기존 할 일 안 보임, document.cookie로 세션 쿠키 읽을 수 없음(HttpOnly). T08 회귀: 등록·HTML 제목 글자 표시(img 실행 안 됨)·빈 제목 거절·상태 변경 DB 반영·수정·삭제 취소 유지·삭제 확인 시 해당 항목만. 새로고침 후 로그인·목록 유지. 로그아웃 시 로그인 화면·안내, 목록·입력·필터 지움, 새로고침해도 로그인 화면. B 로그인 시 A 할 일 안 보임. 열린 화면에서 세션 만료 후 등록 → 로그인 화면·만료 안내·오류 배너 없음·등록 안 됨·B 목록 안 남음. API 중지 시 "로그인 상태를 확인하지 못했습니다" 배너, 다시 불러오기로 로그인 화면 복구. 375px 로그인·할 일 화면 가로 스크롤 없음, JS 오류 없음. 첫 확인 때 로그인 화면에서 API 오류 배너가 숨겨지는 문제를 발견해 할 일 요청 오류만 숨기도록 고쳤다. 시험 데이터 삭제 후 users·sessions 0건, tasks id 6만.
   - 남은 오류: 없음. 아이디는 영문 소문자·숫자만 허용되어 HTML이 들어갈 수 없으며, 표시는 textContent로 한다. 화면 확인은 자동 브라우저로만 했고 사용자 브라우저 확인은 T21 배포 후 진행한다. 배포본 반영은 T21.
-- [ ] T21: 배포본(App·Web)에 반영한다.
+- [x] T21: 배포본(App·Web)에 반영한다.
   확인: http://localhost 에서 두 사용자로 등록·분리 확인, App 재시작 후 데이터·로그인 유지, 로그에 비밀번호 미노출.
+  - 변경 파일: 없음(배포 스크립트 그대로 사용). DB는 T16에서 이미 변경했고 새 패키지 없음.
+  - 실행 명령: (사용자) sudo bash deploy/install-app.sh, sudo bash deploy/install-web.sh → (사용자) sudo systemctl restart task-flow-api
+  - 확인 결과(2026-10-14): 반영 후 task-flow-api active(14:47:30 시작, NRestarts 0)·nginx active, /opt/task-flow/app/backend·/var/www/task-flow가 저장소 backend/·frontend/와 차이 없음, 8001 health ok. localhost / 200·로그인 폼 포함, 비로그인 /api/tasks·/api/auth/me 401. http://127.0.0.1(Nginx, CSP 적용)에서 T20 브라우저 확인 35개 통과(가입·로그인·두 사용자 분리·로그아웃·만료·HTML 글자 표시·375px·JS 오류 없음), Nginx 경유 T19 API 확인 65개 통과. 시험 계정으로 로그인·할 일 등록 후 사용자가 App 재시작(PID 25823 → 26271, journal Started 14:48:42) → 같은 쿠키로 /api/auth/me 200·할 일 목록 유지. 서비스 로그에 비밀번호·세션 값 없음. 시험 데이터 삭제 후 users·sessions 0건, tasks id 6(주인 없음)만.
+  - 남은 오류: 없음. 사용자 브라우저와 ngrok 주소에서의 확인은 아직 하지 않았다. 주인 없는 기존 할 일(id 6 "바이브코딩")은 PRD에 따라 누구에게도 보이지 않으며 DB에 남아 있다.
 ## 추가 작업
 - [x] 개발 서버 통합: 화면(5500)과 API(8000)를 개발 서버 하나(8000)로 합친다(사용자 요청, 2026-10-13).
   - 변경 파일: backend/main.py(프로젝트에 frontend/가 있으면 / 로 화면 제공, CORS 제거), frontend/app.js(API_BASE를 같은 주소로 고정), API-SPEC.md(CORS 설명을 같은 주소 제공으로 변경), PLAN.md(실행 기준)
