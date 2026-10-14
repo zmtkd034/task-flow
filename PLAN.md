@@ -110,8 +110,13 @@
   - 실행 명령: 없음(문서 작업). grep으로 명세 항목 확인.
   - 확인 결과(2026-10-14): F10 아이디 ^[a-z0-9]{4,20}$·비밀번호 8~64자·409, F11 같은 401 메시지·세션 유지, F12 로그아웃 후 401, F13 비로그인 401·다른 사용자 404·주인 없는 행 비표시가 명세에 모두 있음. 예시 비밀번호는 가짜 값. 코드는 바꾸지 않았다.
   - 남은 오류: 없음. Secure 쿠키는 HTTP 배포라 쓰지 않는다(HTTPS는 PRD 범위 밖). 로그인 시도 횟수 제한은 PRD에 없어 정의하지 않았다.
-- [ ] T16: users·sessions 테이블 추가, tasks에 user_id(NULL 허용) 열 추가.
+- [x] T16: users·sessions 테이블 추가, tasks에 user_id(NULL 허용) 열 추가.
   확인: init_db 재실행 시 기존 tasks 행이 그대로 남는다. 열 추가는 ALTER TABLE ADD COLUMN으로 하며 DROP·TRUNCATE를 하지 않는다.
+  - 변경 파일: backend/models.py(UserRow·SessionRow 추가, TaskRow.user_id), backend/init_db.py(새 테이블 생성, tasks.user_id 없으면 ALTER TABLE ADD COLUMN·인덱스·외래 키 한 문장으로 추가)
+  - 테이블: users(id, username VARCHAR(20) utf8mb4_bin UNIQUE·CHECK ^[a-z0-9]{4,20}$, password_hash VARCHAR(255), created_at), sessions(id, token_hash VARCHAR(64) UNIQUE, user_id FK→users NOT NULL, created_at, expires_at), tasks.user_id INT NULL FK→users·인덱스 ix_tasks_user_id
+  - 실행 명령: .venv 활성화 후 python -m backend.init_db
+  - 확인 결과(2026-10-14): 실행 전 tasks 1건(id 6 "바이브코딩"), AUTO_INCREMENT 7 기록. 1회차 users·sessions 생성, tasks 그대로, user_id 열 추가. 2회차 모두 "이미 있어 그대로 두었습니다". SHOW CREATE TABLE로 열·UNIQUE·CHECK·외래 키·인덱스 확인. 기존 행 id 6 내용 그대로, user_id NULL. 트랜잭션 안에서 확인 후 ROLLBACK(18개 통과): 아이디 4자·20자·소문자+숫자 허용, 중복(1062)·대문자·3자·공백·한글·특수문자(4025)·21자(1406)·password_hash NULL(1048) 거절, 세션 정상 허용·token_hash 중복(1062)·없는 사용자(1452)·user_id NULL(1048) 거절, 할 일 주인 있음·NULL 허용·없는 사용자(1452) 거절. 확인 후 users·sessions 0건, AUTO_INCREMENT 원래대로. 임시 API(8010, 현재 코드)로 기존 할 일 API 확인: GET 200(id 6 표시), 빈 제목·user_id 전송 422, POST 201(DB user_id NULL)·PATCH 200·HIGH 필터·DELETE 204, 시험 항목 삭제 후 AUTO_INCREMENT 7로 되돌림. 배포 App(8001, 이전 코드)·Web(localhost) /api/tasks 정상 응답(새 열 추가 후에도 영향 없음).
+  - 남은 오류: 없음. API는 아직 user_id를 쓰지 않아 새 할 일은 주인 없음(NULL)으로 저장된다. T19 이후 주인 없는 할 일(현재 id 6 포함)은 누구에게도 보이지 않는다(PRD, 삭제하지 않음).
 - [ ] T17: 회원가입 API. 비밀번호는 표준 라이브러리 hashlib.scrypt와 사용자별 salt로 해시해 저장한다(새 패키지 없음).
   확인: 정상 201, 규칙 위반 422, 중복 아이디 409. DB에 비밀번호 원문이 없다.
 - [ ] T18: 로그인·로그아웃·현재 사용자 API. 로그인 상태는 DB 세션과 HttpOnly·SameSite=Lax 쿠키로 유지한다.
